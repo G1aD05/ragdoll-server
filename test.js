@@ -20,6 +20,13 @@ const tx = (w, o) => w.send(JSON.stringify(o));
   const g2 = await open(), g3 = await open(), g4 = await open();
   for (const g of [g2, g3]) { tx(g, { t: 'join', room: 'PIZZA42' }); await next(host); }
   tx(g4, { t: 'join', room: 'PIZZA42' }); assert.match((await next(g4)).msg, /full/);
+  // public listing: only rooms whose host asked for it
+  const lister = await open(); tx(lister, { t: 'list' });
+  assert.deepEqual((await next(lister)).rooms, []);
+  const pub = await open(); tx(pub, { t: 'host', room: 'open-1', pub: true, name: 'Zed\u0007 the host' }); await next(pub);
+  tx(lister, { t: 'list' }); const l = (await next(lister)).rooms;
+  assert.deepEqual(l, [{ room: 'OPEN-1', name: 'Zed the host', players: 1, max: 4 }]);
+  pub.close(); lister.close();
   host.close(); assert.match((await next(g1)).msg, /host left/);
   await new Promise((r) => setTimeout(r, 100)); assert.equal(rooms.size, 0);
   console.log('server test ok'); process.exit(0);
