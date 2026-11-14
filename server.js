@@ -4,7 +4,8 @@
 // server only hands the two their connection details (a few KB, once) so the browsers can link up directly with
 // WebRTC. That is why the bandwidth use is tiny and the static game can live on a different host.
 //
-//   Host   -> {t:"host", room}              <- {t:"hosted"} | {t:"error", msg}
+//   Host   -> {t:"host", room, pub?, name?} <- {t:"hosted"} | {t:"error", msg}   (pub: list it for everyone)
+//   Anyone -> {t:"list"}                   <- {t:"rooms", rooms:[{room, name, players, max}]}  (public rooms only)
 //   Guest  -> {t:"join", room}              host gets {t:"guest", gid}
 //   Host   -> {t:"offer", gid, code}        guest gets {t:"offer", code}
 //   Guest  -> {t:"answer", code}            host gets {t:"answer", gid, code}
@@ -55,13 +56,19 @@ wss.on('connection', (ws, req) => {
     if (!m || typeof m !== 'object') return;
     if (m.t === 'ping') return send(ws, { t: 'pong' });
 
+    if (m.t === 'list' && !role) {
+      const out = [...rooms].filter(([, r]) => r.pub).sort((a, b) => b[1].at - a[1].at).slice(0, 40)
+        .map(([room, r]) => ({ room, name: r.name, players: 1 + r.guests.size, max: 1 + MAX_GUESTS }));
+      return send(ws, { t: 'rooms', rooms: out });
+    }
     if (m.t === 'host' && !role) {
       const name = String(m.room || '').trim().toUpperCase();
       if (!ROOM_RE.test(name)) return bad(ws, 'room codes are 3-24 letters, numbers, - or _');
       if (rooms.has(name)) return bad(ws, 'that room code is already taken, pick another');
       if (rooms.size >= MAX_ROOMS) return bad(ws, 'the server is full right now, try again later');
       role = 'host'; room = name;
-      rooms.set(name, { host: ws, guests: new Map(), next: 1 });
+      const label = String(m.name || '').replace(/[^\x20-\x7e]/g, '').trim().slice(0, 20);
+      rooms.set(name, { host: ws, guests: new Map(), next: 1, pub: m.pub === true, name: label, at: Date.now() });
       return send(ws, { t: 'hosted', room: name });
     }
     if (m.t === 'join' && !role) {
