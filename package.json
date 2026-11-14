@@ -1,0 +1,10 @@
+{
+  "name": "ragdoll-signal",
+  "version": "1.0.0",
+  "description": "Tiny room-code matchmaker for Ragdoll Playground. Only passes connection details between players; game traffic never touches it.",
+  "main": "server.js",
+  "scripts": { "start": "node server.js", "test": "node test.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": { "ws": "^8.18.0" },
+  "license": "MIT"
+}
